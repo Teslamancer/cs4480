@@ -5,10 +5,12 @@ from socket import *
 from urlparse import urlparse
 import re
 
+# Represents the client side of the proxy
 class client():
 
     test_get = "GET http://www.cs.utah.edu/~kobus/simple.html HTTP/1.0\r\n\r\n"
 
+    #sends a request to the provided hostname on the provided port, and returns the response (if any)
     def make_request(self, hostname, port, request):
         server_name = hostname
         server_port = port
@@ -20,10 +22,11 @@ class client():
         client_socket.close()
         return response
 
+# Represents the server side of the proxy
 class server():
 
     port = 0
-    #server_socket
+    # Starts the server's connection loop
     def start_server(self):
         self.port = input("Please enter the port number to listen on:\n")
         server_socket = socket(AF_INET,SOCK_STREAM)
@@ -41,7 +44,7 @@ class server():
             remote_response = c.make_request(hostname, port, request)
 
             connection_socket.send(remote_response)
-
+    # parses a request to determine the hostname and port (if no port is specified, assumes 80)
     def parse_request(self, request):
         url = re.findall(r"[^GET ]\S*(?= HTTP\/1.0)",request)
         url_parser = urlparse(url.pop())
