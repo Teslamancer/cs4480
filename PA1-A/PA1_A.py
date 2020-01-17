@@ -16,6 +16,7 @@ class client():
         client_socket.connect((server_name,server_port))        
         client_socket.send(request)
         response = client_socket.recv(1024)
+        print response
         client_socket.close()
         return response
 
@@ -35,18 +36,21 @@ class server():
             print "requested: " + request
             c = client()
             urldata = self.parse_request(request)
-            hostname=urldata.hostname
-            port=urldata.port
+            hostname=urldata[0]
+            port=urldata[1]
             remote_response = c.make_request(hostname, port, request)
 
             connection_socket.send(remote_response)
 
     def parse_request(self, request):
-        url = re.search(r"[^(GET|PUT|HEAD|POST|DELETE) ]\S*(?= HTTP\/1.0)",request)
-        url_parser = urlparse(url.group())
+        url = re.findall(r"[^GET ]\S*(?= HTTP\/1.0)",request)
+        url_parser = urlparse(url.pop())
         hostname = url_parser.hostname
         port = url_parser.port
-        return(url_parser)
+        if port is None:
+            port=80
+        tup = (hostname, port)
+        return(tup)
 
 
 s = server()
