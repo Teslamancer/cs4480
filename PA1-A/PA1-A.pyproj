@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>be2f27fb-14ea-466e-b943-c93a6d339697</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>PA1_A.py</StartupFile>
+    <StartupFile>Hunter_Schmidt_u0916776.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -22,7 +22,7 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="PA1_A.py" />
+    <Compile Include="Hunter_Schmidt_u0916776.py" />
   </ItemGroup>
   <ItemGroup>
     <InterpreterReference Include="Global|PythonCore|2.7" />
