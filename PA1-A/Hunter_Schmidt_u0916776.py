@@ -4,6 +4,7 @@
 from socket import *
 from urlparse import urlparse
 import re
+from datetime import datetime
 
 # Represents the client side of the proxy
 class client():
@@ -21,7 +22,7 @@ class client():
         #request = self.test_multiline
         client_socket.send(request.encode(encoding='ascii'))
         response = client_socket.recv(1024)
-        print response
+        #print response
         client_socket.close()
         return response
 
@@ -39,7 +40,7 @@ class server():
         while True:
             connection_socket, addr = server_socket.accept()
             request = connection_socket.recv(1024)
-            print "requested: " + request
+            #print "requested: " + request
             
             self.handle_request(connection_socket, request)
             
@@ -47,38 +48,79 @@ class server():
     def handle_request(self, connection_socket, request):
         c = client()
         urldata = self.parse_request(str(request))
-        hostname=urldata[0]
-        port=urldata[1]
-        path=urldata[2]
-        headers = urldata[3]
-        remote_request = "GET " + path +" HTTP/1.0\r\nHost: " + hostname +"\r\nConnection: close\r\n" #GET /~kobus/simple.html \r\nHost: http://www.cs.utah.edu/\r\nConnection: close\r\n\r\n
-        for header in headers:
-            if header !="" and re.match("^Connection: ", header) is None and re.match("^Host: ", header) is None and header !="\"":
+        error_occured = urldata[0]
+
+        if error_occured != True:
+            hostname=urldata[1]
+            port=urldata[2]
+            path=urldata[3]
+            headers = urldata[4]
+            remote_request = "GET " + path +" HTTP/1.0\r\nHost: " + hostname +"\r\nConnection: close\r\n" #GET /~kobus/simple.html \r\nHost: http://www.cs.utah.edu/\r\nConnection: close\r\n\r\n
+            for header in headers:                
                 remote_request += header+"\r\n"
-        remote_request+= "\r\n"
-        remote_response = c.make_request(hostname, port, remote_request.encode(encoding='ascii'))
+            remote_request+= "\r\n"
+            remote_response = c.make_request(hostname, port, remote_request.encode(encoding='ascii'))
+
+        else:
+            remote_response = urldata[1]
+
         connection_socket.send(remote_response)
 
     # parses a request to determine the hostname and port (if no port is specified, assumes 80)
     def parse_request(self, request):
         #test_request="GET http://www.cs.utah.edu/~kobus/simple.html HTTP/1.0\r\nHost: www.cs.utah.edu\r\nConnection: close\r\nTest: test1\r\nTest2: test2\r\n\r\n"
-        find_url = r"[^GET ]\S*(?= HTTP)"
-        url = re.findall(find_url, request)      
-        url_parser = urlparse(url.pop(0))
-        hostname = url_parser.hostname
-        port = url_parser.port
-        path = url_parser.path
+        #test_not_implemented="POST http://test.com HTTP/1.0\r\n\r\n"
+
+        error_message = self.determine_error(request)
+
+        if error_message[0] != True:
+            find_url = r"(?<=GET\s)\S*(?= HTTP)"
+            url = re.findall(find_url, request)   
+            
+            headers=error_message[1]
+            
+            url_parser = urlparse(url.pop(0))
+            hostname = url_parser.hostname
+            port = url_parser.port
+            path = url_parser.path
         
-        headers = request.splitlines()
-        headers.pop(0)
-        if port is None:
-            port=80
-        tup = (hostname, port, path, headers)
-        return(tup)
+            if port is None:
+                port=80
+            tup = (False, hostname, port, path, headers)
+            return(tup)
+        
+        
+        return error_message
+
+    def determine_error(self, request):
+        has_error=False
+        not_implemented = re.match("^(HEAD|POST|PUT|DELETE|CONNECT|OPTIONS|TRACE|PATCH)", request)
+        if not_implemented:
+            error_message = "HTTP/1.0 501 Not Implemented\r\nDate: " + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %Z") +"\r\nServer: PythonProxy/0.0.1\r\nConnection: Closed"
+            has_error=True
+        elif re.match("^GET", request) is None:
+            error_message = "HTTP/1.0 400 Bad Request\r\nDate: " + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %Z") +"\r\nServer: PythonProxy/0.0.1\r\nConnection: Closed"
+            has_error=True
+        else:
+            headers = request.splitlines()
+            headers.pop(0)
+            headers_to_pass=[]
+            for header in headers:
+                if header !="" and header !="\"" and re.match("^\S+:\s\S+", header) is not None:
+                    if re.match("^Connection: ", header) is None and re.match("^Host: ", header) is None:
+                        headers_to_pass.append(header)
+                else:
+                    error_message = "HTTP/1.0 400 Bad Request\r\nDate: " + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %Z") +"\r\nServer: PythonProxy/0.0.1\r\nConnection: Closed"
+                    has_error=True
+            has_error=False
+            error_message=headers_to_pass
+
+        return(has_error, error_message)
 
 
 
 
+#creates and starts a server for the proxy
 s = server()
 s.start_server()
 
