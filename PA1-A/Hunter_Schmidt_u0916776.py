@@ -5,6 +5,7 @@ from socket import *
 from urlparse import urlparse
 import re
 from datetime import datetime
+import sys
 
 # Represents the client side of the proxy
 class client():
@@ -31,18 +32,21 @@ class server():
 
     port = 0
     # Starts the server's connection loop
-    def start_server(self):
-        self.port = input("Please enter the port number to listen on:\n")
+    def start_server(self, port):
+        self.port = port
         server_socket = socket(AF_INET,SOCK_STREAM)
         server_socket.bind(('',int(self.port)))
         server_socket.listen(1)
         print "Server listening on port: " + str(self.port)
         while True:
-            connection_socket, addr = server_socket.accept()
-            request = connection_socket.recv(1024)
-            #print "requested: " + request
+            try:
+                connection_socket, addr = server_socket.accept()
+                request = connection_socket.recv(1024)
+                #print "requested: " + request
             
-            self.handle_request(connection_socket, request)
+                self.handle_request(connection_socket, request)
+            except (KeyboardInterrupt, SystemExit):
+                raise
             
 
     def handle_request(self, connection_socket, request):
@@ -121,7 +125,25 @@ class server():
 
 
 #creates and starts a server for the proxy
-s = server()
-s.start_server()
+def main(argv):
+    port=12345
+    arguments = len(sys.argv)-1
+
+    for i in range(1, arguments):
+        if sys.argv[i] == "-h" or sys.argv[i] == "--help":
+            print "Currently some telnet clients prepend all \ with \, causing a double escape. This breaks the parsing of the HTTP request. Normal browsers do not exhibit this behavior\nTry using -p <port> or --port <port> to specify the listening port without a prompt.\nIf no port is specified, defaults to 12345.\n"
+            sys.exit()
+        elif (sys.argv[i] == "-p" or sys.argv[i] == "--port") and i <= arguments:
+            port = int(sys.argv[i+1])
+            break
+        else:
+            print "Invalid arguments! type '-h' or '--help' for help.\n"
+            sys.exit()
+    s = server()
+    s.start_server(port)
+
+
+if __name__ == "__main__":
+    main(sys.argv)
 
 
