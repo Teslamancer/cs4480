@@ -22,17 +22,17 @@ class client():
         client_socket.connect((server_name,server_port))     
         #request = self.test_multiline
         client_socket.send(request.encode(encoding='ascii'))#TODO: Make sure this sends all data for large request
-        response = receive_all(client_socket)
+        response = self.receive_all(client_socket)
         #print response
         client_socket.close()
         return response
 
-    def receive_all(the_socket):
-        end_request='\r\n\r\n'
+    def receive_all(self, the_socket):
+        end_http_message='\r\n\r\n'
         message=[];data=''
         while True:
             data=the_socket.recv(1024)
-            if End in message:
+            if end_http_message in message:
                 break
             message.append(data)
         return ''.join(message)
@@ -52,19 +52,19 @@ class server():
             try:
                 connection_socket, addr = server_socket.accept()
                 
-                request = receive_all(connection_socket)
+                request = self.receive_all(connection_socket)
                 #print "requested: " + request
             
                 self.handle_request(connection_socket, request)
             except (KeyboardInterrupt, SystemExit):
                 raise
 
-    def receive_all(the_socket):
-        end_request='\r\n\r\n'
+    def receive_all(self, the_socket):
+        end_http_message='\r\n\r\n'
         message=[];data=''
         while True:
             data=the_socket.recv(1024)
-            if End in message:
+            if end_http_message in message:
                 break
             message.append(data)
         return ''.join(message)
