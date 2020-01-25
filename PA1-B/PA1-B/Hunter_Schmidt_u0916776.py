@@ -21,11 +21,21 @@ class client():
         client_socket = socket(AF_INET,SOCK_STREAM)
         client_socket.connect((server_name,server_port))     
         #request = self.test_multiline
-        client_socket.send(request.encode(encoding='ascii'))
-        response = client_socket.recv(1024)
+        client_socket.send(request.encode(encoding='ascii'))#TODO: Make sure this sends all data for large request
+        response = receive_all(client_socket)
         #print response
         client_socket.close()
         return response
+
+    def receive_all(the_socket):
+        end_request='\r\n\r\n'
+        message=[];data=''
+        while True:
+            data=the_socket.recv(1024)
+            if End in message:
+                break
+            message.append(data)
+        return ''.join(message)
 
 # Represents the server side of the proxy
 class server():
@@ -41,12 +51,23 @@ class server():
         while True:
             try:
                 connection_socket, addr = server_socket.accept()
-                request = connection_socket.recv(1024)
+                
+                request = receive_all(connection_socket)
                 #print "requested: " + request
             
                 self.handle_request(connection_socket, request)
             except (KeyboardInterrupt, SystemExit):
                 raise
+
+    def receive_all(the_socket):
+        end_request='\r\n\r\n'
+        message=[];data=''
+        while True:
+            data=the_socket.recv(1024)
+            if End in message:
+                break
+            message.append(data)
+        return ''.join(message)
             
 
     def handle_request(self, connection_socket, request):
@@ -68,7 +89,7 @@ class server():
         else:
             remote_response = urldata[1]
 
-        connection_socket.send(remote_response)
+        connection_socket.send(remote_response)#TODO: make this send all if larger than buffer
 
     # parses a request to determine the hostname and port (if no port is specified, assumes 80)
     def parse_request(self, request):
