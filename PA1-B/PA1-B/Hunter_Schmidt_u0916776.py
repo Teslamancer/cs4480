@@ -21,7 +21,7 @@ class client():
         client_socket = socket(AF_INET,SOCK_STREAM)
         client_socket.connect((server_name,server_port))     
         #request = self.test_multiline
-        client_socket.send(request.encode(encoding='ascii'))#TODO: Make sure this sends all data for large request
+        client_socket.sendall(request.encode(encoding='ascii'))
         response = self.receive_all(client_socket)
         #print response
         client_socket.close()
@@ -89,7 +89,7 @@ class server():
         else:
             remote_response = urldata[1]
 
-        connection_socket.send(remote_response)#TODO: make this send all if larger than buffer
+        connection_socket.sendall(remote_response)
 
     # parses a request to determine the hostname and port (if no port is specified, assumes 80)
     def parse_request(self, request):
