@@ -52,7 +52,7 @@ class server():
             try:
                 connection_socket, addr = server_socket.accept()
                 
-                request = self.receive_all(connection_socket)
+                request = self.receive_all(connection_socket)#TODO: figure out why all escapes are prepended
                 #print "requested: " + request
             
                 self.handle_request(connection_socket, request)
@@ -148,7 +148,7 @@ class server():
 #creates and starts a server for the proxy
 def main(argv):
     port=12345
-    arguments = len(sys.argv)-1
+    arguments = len(sys.argv)-1#TODO: Make arguments work for server
 
     for i in range(1, arguments):
         if sys.argv[i] == "-h" or sys.argv[i] == "--help":
