@@ -1,11 +1,14 @@
 #Hunter Schmidt, u0916776
-# Version 0.1.0
+# Version 1.0.0
 from socket import *
 from urlparse import urlparse
 import re
 from datetime import datetime
 import argparse
 from threading import Thread
+import hashlib
+import json
+import requests
 
 # Represents the client side of the proxy
 class client():
@@ -23,24 +26,70 @@ class client():
         client_socket.connect((server_name,server_port))     
         #request = self.test_multiline
         client_socket.sendall(request.encode(encoding='ascii'))
+        #response = client_socket.recv(2048)
         response = client.receive_all(client_socket)
+        full_message = response[0]
+        body=response[1]
+        md5 = hashlib.md5(body).hexdigest()
+        if(client.isVirus(md5)):
+            return "HTTP/1.0 200 OK\r\nDate: " + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %Z") + "\r\nServer: PythonProxy/0.0.1\r\nConnection: Closed\r\nContent-Type: text/html\r\nContent-Length: 46\r\n" + "<html><h>File contained known virus</h></html>"
         #print response
         client_socket.close()
-        return response
+        return full_message
+
+    @staticmethod
+    def isVirus(md5):
+        
+        #query='GET \ https://www.virustotal.com/vtapi/v2/file/report?apikey=a17b64078af8488b98ad0f59ac9ce7e25fbf9ba8f811c96f5ed77d0db1bee9cf&resource='+md5
+        url = 'https://www.virustotal.com/vtapi/v2/file/report'
+        params = {'apikey': 'a17b64078af8488b98ad0f59ac9ce7e25fbf9ba8f811c96f5ed77d0db1bee9cf', 'resource': md5}
+        response = requests.get(url, params=params)
+        report = json.loads(response.text)
+        for scan in report['scans']:
+            #report_scan = json.loads(scan)
+            if report['scans'][scan]['detected']:
+                return True
+        return False
+
+
+
 
     @staticmethod#waits on receive until http terminal characters are sent
     def receive_all(the_socket):
-        end_http_message_long = '\r\n\r\n'
-        end_http_message_short = '\n\n'
-        message = ''
-        data = ''
-        while ((end_http_message_long not in message[-4:]) and (end_http_message_short not in message[-2:])):
+        message = []
+        data = []
+        bytes_recv = 0
+        message_size = 100000000
+        message_size_recvd = False
+        try:
             data = the_socket.recv(1024)
-            #print data
             message+=data
+            while (bytes_recv < message_size):
+                if not message_size_recvd:
+                    headers = ''.join(message).splitlines()
+                    for header in headers:
+                        if "Content-Length" in header or "content-length" in header:
+                            message_size = int(header[+15:])
+                            message_size_recvd=True
+                            break
+                data = the_socket.recv(1024)
+                #print data
+                message+=data
+                #bytes_recv+=sys.getsizeof(data)
+                p = ''.join(message).find('\r\n\r\n')
+                if p:
+                    p +=4
+                if not p:
+                    p = ''.join(message).find('\n\n')
+                    p+=2
+                if p >=0:
+                    bytes_recv = len(message[p:])
+        except timeout:
+            error_message = "HTTP/1.0 408 Request Timeout\r\nDate: " + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %Z") + "\r\nServer: PythonProxy/0.0.1\r\nConnection: Closed\r\n\r\n"
             
-                        
-        return message
+        
+        body = message[p:]
+        return ((''.join(message)),(''.join(body)))
 
 # Represents the server side of the proxy
 class server():
@@ -83,7 +132,7 @@ class server():
                 #print data
                 message+=data
         except timeout:
-            error_message = "HTTP/1.0 408 Request Timeout\r\nDate: " + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %Z") + "\r\nServer: PythonProxy/0.0.1\r\nConnection: Closed"
+            error_message = "HTTP/1.0 408 Request Timeout\r\nDate: " + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %Z") + "\r\nServer: PythonProxy/0.0.1\r\nConnection: Closed\r\n\r\n"
             the_socket.sendall(error_message)
             the_socket.close()
             return
@@ -148,10 +197,10 @@ class server():
         has_error = False
         not_implemented = re.match("^(HEAD|POST|PUT|DELETE|CONNECT|OPTIONS|TRACE|PATCH)", request)
         if not_implemented:
-            error_message = "HTTP/1.0 501 Not Implemented\r\nDate: " + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %Z") + "\r\nServer: PythonProxy/0.0.1\r\nConnection: Closed"
+            error_message = "HTTP/1.0 501 Not Implemented\r\nDate: " + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %Z") + "\r\nServer: PythonProxy/0.0.1\r\nConnection: Closed\r\n\r\n"
             has_error = True
         elif re.match("^GET", request) is None:
-            error_message = "HTTP/1.0 400 Bad Request\r\nDate: " + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %Z") + "\r\nServer: PythonProxy/0.0.1\r\nConnection: Closed"
+            error_message = "HTTP/1.0 400 Bad Request\r\nDate: " + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %Z") + "\r\nServer: PythonProxy/0.0.1\r\nConnection: Closed\r\n\r\n"
             has_error = True
         else:
             headers = request.splitlines()
