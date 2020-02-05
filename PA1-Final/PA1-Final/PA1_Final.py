@@ -24,19 +24,21 @@ class client():
         server_port = port
         client_socket = socket(AF_INET,SOCK_STREAM)
         client_socket.connect((server_name,server_port))     
-        #request = self.test_multiline
-        client_socket.sendall(request.encode(encoding='ascii'))
-        #response = client_socket.recv(2048)
+        client_socket.sendall(request.encode(encoding='ascii'))#sends request to remote server
         response = client.receive_all(client_socket)
-        full_message = response[0]
+        full_message = response[0]#seperates response into the full_message and the body
         body=response[1]
-        md5 = hashlib.md5(body).hexdigest()
-        if(client.isVirus(md5)):
-            return "HTTP/1.0 200 OK\r\nDate: " + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %Z") + "\r\nServer: PythonProxy/0.0.1\r\nConnection: Closed\r\nContent-Type: text/html\r\nContent-Length: 46\r\n" + "<html><h>File contained known virus</h></html>"
+        md5 = hashlib.md5(body).hexdigest()#creates md5 of body
+        is_virus = client.isVirus(md5)#checks if body content contains malware
+        if(is_virus == 204):#returns 503 if API has no more queries due to public API only allowing 4 queries per minute
+            return "HTTP/1.0 503 Service Unavailable\r\nDate: " + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %Z") + "\r\nServer: PythonProxy/0.0.1\r\nConnection: Closed\r\n\r\n"
+        elif(is_virus):#returns simple html saying the file has malware if virustotal says it had malware
+            return "HTTP/1.0 200 OK\r\nDate: " + datetime.now().strftime("%a, %d %b %Y %H:%M:%S %Z") + "\r\nServer: PythonProxy/0.0.1\r\nConnection: Closed\r\nContent-Type: text/html\r\nContent-Length: 115\r\n" + "<!DOCTYPE html>\r\n<html>\r\n<body>\r\n\r\n<h1>Requested File contained Malware!</h1>\r\n</body>\r\n</html>\r\n\r\n"
         #print response
         client_socket.close()
-        return full_message
+        return full_message#if wasn't malware and API scanned successfully, returns response from server
 
+    #checks if given md5 hash is for a file containing malware
     @staticmethod
     def isVirus(md5):
         
@@ -44,8 +46,12 @@ class client():
         url = 'https://www.virustotal.com/vtapi/v2/file/report'
         params = {'apikey': 'a17b64078af8488b98ad0f59ac9ce7e25fbf9ba8f811c96f5ed77d0db1bee9cf', 'resource': md5}
         response = requests.get(url, params=params)
+        if(response.status_code == 204):#returns 204 if API has run out of requests
+            return 204
         report = json.loads(response.text)
-        for scan in report['scans']:
+        if(report['response_code']!=1):#returns false if the file wasn't found in virustotal database
+            return False
+        for scan in report['scans']:#goes through all reports and returns true if any are true
             #report_scan = json.loads(scan)
             if report['scans'][scan]['detected']:
                 return True
@@ -114,7 +120,7 @@ class server():
 
     @staticmethod
     def on_connect(the_socket):
-        request = server.receive_all(the_socket)#TODO: figure out why all escapes are prepended
+        request = server.receive_all(the_socket)
         if request is None:
             return
         server.handle_request(the_socket, request)
@@ -167,10 +173,6 @@ class server():
     # specified, assumes 80)
     @staticmethod
     def parse_request(request):
-        #test_request="GET http://www.cs.utah.edu/~kobus/simple.html
-        #HTTP/1.0\r\nHost: www.cs.utah.edu\r\nConnection: close\r\nTest:
-        #test1\r\nTest2: test2\r\n\r\n"
-        #test_not_implemented="POST http://test.com HTTP/1.0\r\n\r\n"
 
         error_message = server.determine_error(request)
 
