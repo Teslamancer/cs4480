@@ -109,8 +109,8 @@ class LoadBalancingSwitch(app_manager.RyuApp):
         p.serialize()
         LOG.debug(in_port)
         LOG.debug(output_port)
-        #actions = [parser.OFPActionSetField(ipv4_dst=output_ip),parser.OFPActionOutput(output_port)]#TODO: Fix this. Maybe set up so switch sends ARP?
-        actions = [parser.OFPActionOutput(output_port)]
+        actions = [parser.OFPActionSetField(ipv4_dst=output_ip),parser.OFPActionOutput(output_port)]#TODO: Fix this. Maybe set up so switch sends ARP?
+        #actions = [parser.OFPActionOutput(output_port)]
         match = parser.OFPMatch(in_port=in_port,ipv4_dst="10.0.0.10",eth_type=0x800)
         self.add_flow(datapath,1,match,actions)
         LOG.debug("Added Flow")
