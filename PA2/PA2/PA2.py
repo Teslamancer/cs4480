@@ -71,24 +71,35 @@ class LoadBalancingSwitch(app_manager.RyuApp):
         arp_pkt = pkt.get_protocol(arp)
         dst_ip = arp_pkt.dst_ip
         self.generate_arp_reply(datapath, eth_frame, arp_pkt, dst_ip, port)
-
+        
     def generate_arp_reply(self, datapath, eth_frame, arp_pkt, dest_ip, in_port):
         dstIp = arp_pkt.src_ip
         srcIp = arp_pkt.dst_ip
         dstMac = eth_frame.src
-        #parser = datapath.ofproto_parser
-
+        parser = datapath.ofproto_parser
+        output_port = 0
+        output_ip ="10.0.0.0"
         if srcIp == HOST1_IP:
             srcMac = HOST1_MAC
+            output_port=1
         elif srcIp == HOST2_IP:
             srcMac = HOST2_MAC
+            output_port=2
         elif srcIp == HOST3_IP:
             srcMac = HOST3_MAC
+            output_port=3
         elif srcIp == HOST4_IP:
             srcMac = HOST4_MAC
+            output_port=4
         else:
             srcMac = self.get_mac()
-        outPort = in_port
+            if srcMac == "00:00:00:00:00:05":
+                output_port=5
+                output_ip ="10.0.0.5"
+            else:
+                output_port=6
+                output_ip ="10.0.0.6"
+        #outPort = in_port
         #LOG.debug("Got to sending the ARP response!!!!")
         e = ethernet(dstMac,srcMac,ether.ETH_TYPE_ARP)
         a = arp(1,0x0800,6,4,2,srcMac,srcIp,dstMac,dstIp)
@@ -96,7 +107,13 @@ class LoadBalancingSwitch(app_manager.RyuApp):
         p.add_protocol(e)
         p.add_protocol(a)
         p.serialize()
-        #actions = [parser]
+        LOG.debug(in_port)
+        LOG.debug(output_port)
+        #actions = [parser.OFPActionSetField(ipv4_dst=output_ip),parser.OFPActionOutput(output_port)]#TODO: Fix this. Maybe set up so switch sends ARP?
+        actions = [parser.OFPActionOutput(output_port)]
+        match = parser.OFPMatch(in_port=in_port,ipv4_dst="10.0.0.10",eth_type=0x800)
+        self.add_flow(datapath,1,match,actions)
+        LOG.debug("Added Flow")
         self.send_arp_reply(datapath,in_port,p)
 
     #sends packet from switch out specified port
