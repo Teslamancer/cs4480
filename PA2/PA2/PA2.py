@@ -18,20 +18,34 @@ LOG = logging.getLogger('LoadBalancingSwitch')
 LOG.setLevel(logging.DEBUG)
 logging.basicConfig()
 
+HOST1_IP = "10.0.0.1"
+HOST2_IP = "10.0.0.2"
+HOST3_IP = "10.0.0.3"
+HOST4_IP = "10.0.0.4"
+
+HOST1_MAC = "00:00:00:00:00:01"
+HOST2_MAC = "00:00:00:00:00:02"
+HOST3_MAC = "00:00:00:00:00:03"
+HOST4_MAC = "00:00:00:00:00:04"
+
+
+
 class LoadBalancingSwitch(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
-
+    current_server=0
 
     def __init__(self, *args, **kwargs):
         super(LoadBalancingSwitch, self).__init__(*args, **kwargs)
         self.hw_addr = ''
-
-    #helper method adds a flow with specified match and action
-    def add_flow(self, datapath, match, actions, buffer_id=None):
-        ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
-
         
+    def get_mac(self):
+        switch = LoadBalancingSwitch.current_server % 2
+        if switch == 0:
+            LoadBalancingSwitch.current_server = LoadBalancingSwitch.current_server + 1
+            return "00:00:00:00:00:05"
+        elif switch == 1:
+            LoadBalancingSwitch.current_server = LoadBalancingSwitch.current_server + 1
+            return "00:00:00:00:00:06"
 
 
     #This function is triggered when a packet is sent from the switch to the controller
@@ -62,17 +76,27 @@ class LoadBalancingSwitch(app_manager.RyuApp):
         dstIp = arp_pkt.src_ip
         srcIp = arp_pkt.dst_ip
         dstMac = eth_frame.src
+        #parser = datapath.ofproto_parser
 
-        #For testing purposes, source mac is always 00:00:00:00:00:05
-        srcMac = "00:00:00:00:00:05"
+        if srcIp == HOST1_IP:
+            srcMac = HOST1_MAC
+        elif srcIp == HOST2_IP:
+            srcMac = HOST2_MAC
+        elif srcIp == HOST3_IP:
+            srcMac = HOST3_MAC
+        elif srcIp == HOST4_IP:
+            srcMac = HOST4_MAC
+        else:
+            srcMac = self.get_mac()
         outPort = in_port
-        LOG.debug("Got to sending the ARP response!!!!")
+        #LOG.debug("Got to sending the ARP response!!!!")
         e = ethernet(dstMac,srcMac,ether.ETH_TYPE_ARP)
         a = arp(1,0x0800,6,4,2,srcMac,srcIp,dstMac,dstIp)
         p = Packet()
         p.add_protocol(e)
         p.add_protocol(a)
         p.serialize()
+        #actions = [parser]
         self.send_arp_reply(datapath,in_port,p)
 
     #sends packet from switch out specified port
