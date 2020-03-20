@@ -78,10 +78,13 @@ class LoadBalancingSwitch(app_manager.RyuApp):
         dstMac = eth_frame.src
         parser = datapath.ofproto_parser
         output_port = 0
-        output_ip ="10.0.0.0"
+        output_ip = srcIp
+        is_client = True
+        #LOG.debug(srcIp)
         if srcIp == HOST1_IP:
             srcMac = HOST1_MAC
             output_port=1
+            output_ip ="10.0.0.1"
         elif srcIp == HOST2_IP:
             srcMac = HOST2_MAC
             output_port=2
@@ -93,27 +96,38 @@ class LoadBalancingSwitch(app_manager.RyuApp):
             output_port=4
         else:
             srcMac = self.get_mac()
+            is_client=False
             if srcMac == "00:00:00:00:00:05":
                 output_port=5
-                output_ip ="10.0.0.5"
+                output_ip ="10.0.0.5"                
             else:
                 output_port=6
                 output_ip ="10.0.0.6"
         #outPort = in_port
         #LOG.debug("Got to sending the ARP response!!!!")
+
+        #These Flows are a little borked but really close
+        if is_client:
+            #LOG.debug("installing server -> client flow. srcIp= " + srcIp + "output_ip= " + output_ip)
+            match = parser.OFPMatch(in_port=in_port,ipv4_dst=srcIp,eth_type=0x800)
+            actions = [parser.OFPActionSetField(ipv4_dst=output_ip),parser.OFPActionOutput(output_port)]
+        else:
+            #LOG.debug("installing client -> server flow. dstIp= " + dstIp + "output_ip= " + output_ip)
+            match = parser.OFPMatch(in_port=in_port,ipv4_dst="10.0.0.10",eth_type=0x800)
+            actions = [parser.OFPActionSetField(ipv4_dst=output_ip),parser.OFPActionOutput(output_port)]
+
         e = ethernet(dstMac,srcMac,ether.ETH_TYPE_ARP)
         a = arp(1,0x0800,6,4,2,srcMac,srcIp,dstMac,dstIp)
         p = Packet()
         p.add_protocol(e)
         p.add_protocol(a)
         p.serialize()
-        LOG.debug(in_port)
-        LOG.debug(output_port)
-        actions = [parser.OFPActionSetField(ipv4_dst=output_ip),parser.OFPActionOutput(output_port)]#TODO: Fix this. Maybe set up so switch sends ARP?
-        #actions = [parser.OFPActionOutput(output_port)]
-        match = parser.OFPMatch(in_port=in_port,ipv4_dst="10.0.0.10",eth_type=0x800)
+        #LOG.debug(in_port)
+        #LOG.debug(output_port)
+        
+        
         self.add_flow(datapath,1,match,actions)
-        LOG.debug("Added Flow")
+        #LOG.debug("Added Flow")
         self.send_arp_reply(datapath,in_port,p)
 
     #sends packet from switch out specified port
