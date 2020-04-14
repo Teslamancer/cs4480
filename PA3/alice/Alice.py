@@ -1,3 +1,5 @@
 from Crypto.Hash import SHA
+import requests
 
-print("Test")
+def connect_to_bob():
+    return
