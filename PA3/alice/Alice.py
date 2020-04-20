@@ -8,6 +8,7 @@ from optparse import OptionParser
 from base64 import b64decode, b64encode
 import json
 import os
+import codecs
 
 class message():
     message=''
@@ -26,27 +27,48 @@ class message():
         self.metadata = obj_dict['metadata']
 
     def encode(self):
-        return json.dumps(self, default=lambda o: o.__dict__, 
-            sort_keys=True, indent=4)
+        message_dict = {}
+        message_dict['message'] = self.message
+        message_dict['metadata'] = self.metadata
+        return json.dumps(message_dict, 
+            sort_keys=True, indent=4).encode('ascii')
 
 def main():
     parser = OptionParser()
 
     parser.add_option("-H","--host",dest="bob_address",type="string",default="localhost",help="Specifies hostname/ip address of Bob script. Default is localhost.")
-    parser.add_option("-p","--port",dest="port", type="int",default=11111,help="Specifies port to connect to Bob program on. Default is 2100.")
+    parser.add_option("-p","--port",dest="port", type="int",default=12345,help="Specifies port to connect to Bob program on. Default is 2100.")
     (options,args) = parser.parse_args()
 
     connect_to_bob(options.bob_address, options.port)
 
 def verify_message(message_in, key_location):
     data_in = message_in.message
-    digest_in = message_in.metadata
+    signature = b64decode(message_in.metadata.encode('utf-8'))
+
     here = os.path.dirname(os.path.abspath(__file__))
     filename = os.path.join(here, key_location)
     key = RSA.importKey(open(filename).read())
-    h = SHA.new(data_in)
     verifier = PKCS1_v1_5.new(key)
-    return verifier.verify_message(h, digest_in)
+    digest = SHA.new()
+    digest.update(data_in.encode())
+
+    
+    return verifier.verify(digest, signature)
+
+def sign_message(data, key_location):
+    here = os.path.dirname(os.path.abspath(__file__))
+    filename = os.path.join(here, key_location)
+    key = open(filename,'r').read()
+    rsakey = RSA.importKey(key)
+    signer = PKCS1_v1_5.new(rsakey)
+    digest = SHA.new()
+
+    digest.update(data.encode())
+
+    signature = signer.sign(digest)
+
+    return b64encode(signature).decode('utf-8')
 
 
 
@@ -54,12 +76,14 @@ def connect_to_bob(hostname, port):
     s = socket(AF_INET, SOCK_STREAM)
     s.connect((hostname,port))    
     request_pubkey = message("REQUEST", "PUBKEY")
-    s.sendall(request_pubkey.encode().encode())
+    s.sendall(request_pubkey.encode())
     data = receive_blob(s)
     message_in = message(data)
-    if(verify_message(message_in)):
-        f = open("bobpublickey.pem","x")
-        f.write(b64decode(message_in.message).decode())
+    if(verify_message(message_in, "capublickey.pem")):
+        here = os.path.dirname(os.path.abspath(__file__))
+        filename = os.path.join(here, "bobpublickey.pem")
+        f = open(filename,"x")
+        f.write(message_in.message)
 
 
 def receive_blob(the_socket):
