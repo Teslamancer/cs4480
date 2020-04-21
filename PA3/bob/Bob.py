@@ -36,13 +36,14 @@ class message():
         return json.dumps(message_dict, 
             sort_keys=True, indent=4).encode('utf-8')
 
-
+verbose = True
 
 def main():
     parser = OptionParser()
 
     #parser.add_option("-h","--host",dest="bob_address",type="string",default="localhost",help="Specifies hostname/ip address of Bob script. Default is localhost.")
     parser.add_option("-p","--port",dest="port", type="int",default=4480,help="Specifies port to listen for Alice program on. Default is 4480.")
+    parser.add_option("-q","--quiet",dest="quiet", default=False,help="Suppresses console reporting of progress.")
     (options,args) = parser.parse_args()
 
     # test = message("test message", "test metadata")
@@ -66,7 +67,8 @@ def start_server(port):
     server_socket.listen(1)
     print("Server listening on port: " + str(port))
     connection_socket, addr = server_socket.accept()
-    print("Alice connected!")
+    if(verbose):
+        print("Alice Connected")
     while True:
         init_request = receive_blob(connection_socket)
         if(init_request is None):
@@ -77,22 +79,33 @@ def start_server(port):
 
 def handle_request(the_socket, request):
     if(request.message=="REQUEST" and request.metadata=="PUBKEY"):
-        print("Public Key Requested")
+        if(verbose):
+            print("Public Key Requested")
         send_pubkey(the_socket)
     else:
-        print("Received Message from Alice")
-        print("Decrypting Symmetric Key")
+        if(verbose):
+            print("Received Message from Alice")
+            print("Encrypted Key: " + request.metadata)
+            print("Decrypting Symmetric Key")
         sym_key = message(rsa_decrypt(request.metadata, 'bobprivatekey.pem'))
         key = b64decode(sym_key.message.encode('utf-8'))
         iv = b64decode(sym_key.metadata.encode('utf-8'))
-        print("Decrypting Message")
+        if(verbose):
+            print("DES3 Symmetric Key Values:")
+            print("key: " + key.hex())
+            print("iv: " + iv.hex())
+            print("Decrypting Message")
         message_in = message(des3_decrypt(key, iv, request.message))
         transmission = message_in.message
         signature = message_in.metadata
-        print("Verifying Message")
+        if(verbose):
+            print("Verifying Message")
+            print("Signed Message Digest:")
+            print(message_in.metadata)
         is_valid = verify_message(message_in, 'alicepublickey.pem') 
         if(is_valid):
-            print("Message Verified")
+            if(verbose):
+                print("Message Verified")
             print("Message:")
             print(transmission)
         else:
@@ -102,7 +115,14 @@ def handle_request(the_socket, request):
 
 def send_pubkey(the_socket):
     bob_pubkey = file_to_string('bobpublickey.pem')
+    if(verbose):        
+        print("Signing Message Digest")
     signed_digest = sign_message(bob_pubkey,'caprivatekey.pem')
+    if(verbose):
+        print("Signed Message Hash with CA Private Key:")
+        print(signed_digest)
+        print("Public Key:")
+        print(bob_pubkey)
     to_send = message(bob_pubkey,signed_digest)
     the_socket.sendall(to_send.encode())
     print("Public Key Sent")

@@ -55,7 +55,7 @@ def main():
         print("Requesting Public Key from Bob")
     bob_key = request_pubkey(bob_socket)
     if(verbose):
-        print("Bob Public Key Received:")
+        print("Bob's Public Key:")
         print(bob_key)
 
 
@@ -64,12 +64,7 @@ def main():
         print("Input Message was:")
         print(options.message)
     message_signature = sign_message(options.message, "aliceprivatekey.pem")
-    if(verbose):
-        print("Signing Message Hash with Private Key")
-    message_and_signature = message(options.message, message_signature)
-    if(verbose):
-        print("Hashed Signature Digest:")
-        print(message_signature)
+    
 
     #generate DES3 key and iv, place into a message to hold key and iv
     if(verbose):
@@ -77,20 +72,27 @@ def main():
     (key, iv) = gen_des3_params()#key, iv are bytes
     if(verbose):
         print("Key Values:")
-        print("key: " + key.decode('hex'))
-        print("iv: " + iv.decode('hex'))
+        print("key: " + key.hex())
+        print("iv: " + iv.hex())
     sym_key = message(b64encode(key).decode('utf-8'),b64encode(iv).decode('utf-8'))
+    #encrypt DES3 key and iv message with Bob's public key
+    if(verbose):
+        print("Encrypting Symmetric Key with Bob's Public Key")
+    rsa_encrypted_key = rsa_encrypt_from_string(sym_key.encode(),bob_key)
+    if(verbose):
+        print("Encrypted Key: " + rsa_encrypted_key)
+    if(verbose):
+        print("Signing Message Hash with Private Key")
+    message_and_signature = message(options.message, message_signature)
+    if(verbose):
+        print("Hashed Signature Digest:")
+        print(message_signature)
     #encrypt JSON of message + signature with DES3 key and iv
     if(verbose):
         print("Encrypting Message+Hash with Symmetric Key")
     encrypted_message = des3_encrypt(key, iv, message_and_signature.encode())
 
-    #encrypt DES3 key and iv message with Bob's public key
-    if(verbose):
-        print("Encrypting Symmetric Key with Bob's Public Key")
-    rsa_encrypted_key = rsa_encrypt(sym_key.encode(),'bobpublickey.pem')
-    if(verbose):
-        print("Encrypted Key: " + rsa_encrypted_key)
+    
 
     if(verbose):
         print("Sending data to Bob")
@@ -110,11 +112,20 @@ def main():
 
     #decrypted_message = des3_decrypt(key, iv, encrypted_message)
 
-def rsa_encrypt(data, key_location):
+def rsa_encrypt_from_file(data, key_location):
     here = os.path.dirname(os.path.abspath(__file__))
     filename = os.path.join(here, key_location)
 
     key = RSA.importKey(open(filename).read())
+    cipher = PKCS1_OAEP.new(key)
+
+    ciphertext = cipher.encrypt(data)
+
+    return b64encode(ciphertext).decode('utf-8')
+
+def rsa_encrypt_from_string(data, key_string):
+
+    key = RSA.importKey(key_string)
     cipher = PKCS1_OAEP.new(key)
 
     ciphertext = cipher.encrypt(data)
@@ -197,15 +208,17 @@ def request_pubkey(the_socket):
     data = receive_blob(the_socket)
     message_in = message(data)
     if(verbose):
+        print("Signed Message Digest:")
+        print(message_in.metadata)
+    if(verbose):
         print("Verifying Bob's Public Key")
     if(verify_message(message_in, "capublickey.pem")):
-        if(verbose):
-            print("Verified! Saving to bobpublickey.pem")
-        here = os.path.dirname(os.path.abspath(__file__))
-        filename = os.path.join(here, "bobpublickey.pem")
-        f = open(filename,"x")
-        f.write(message_in.message)
-        print("Bob Public Key Received and Verified")
+        # if(verbose):
+        #     print("Verified! Saving to bobpublickey.pem")
+        # here = os.path.dirname(os.path.abspath(__file__))
+        # filename = os.path.join(here, "bobpublickey.pem")
+        # f = open(filename,"x")
+        # f.write(message_in.message)        
         return message_in.message
 
 
